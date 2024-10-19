@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.express as px
 from huggingface_hub import InferenceClient
 from sentence_transformers import SentenceTransformer
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, OPTICS
 from tqdm import tqdm
 from umap import UMAP
 
@@ -31,6 +31,7 @@ DEFAULT_TEMPLATE = "<s>[INST]{examples}\n\n{instruction}[/INST]"
 class ClusterClassifier:
     def __init__(
         self,
+        clustering_algorithm='dbscan',
         embed_model_name="all-MiniLM-L6-v2",
         embed_device="cpu",
         embed_batch_size=64,
@@ -39,7 +40,7 @@ class ClusterClassifier:
         umap_components=2,
         umap_metric="cosine",
         dbscan_eps=0.08,
-        dbscan_min_samples=50,
+        min_samples=50,
         dbscan_n_jobs=16,
         summary_create=True,
         summary_model="mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -50,6 +51,7 @@ class ClusterClassifier:
         summary_template=None,
         summary_instruction=None,
     ):
+        self.clustering_algorithm = clustering_algorithm
         self.embed_model_name = embed_model_name
         self.embed_device = embed_device
         self.embed_batch_size = embed_batch_size
@@ -60,7 +62,7 @@ class ClusterClassifier:
         self.umap_metric = umap_metric
 
         self.dbscan_eps = dbscan_eps
-        self.dbscan_min_samples = dbscan_min_samples
+        self.min_samples = min_samples
         self.dbscan_n_jobs = dbscan_n_jobs
 
         self.summary_create = summary_create
@@ -69,6 +71,9 @@ class ClusterClassifier:
         self.summary_n_examples = summary_n_examples
         self.summary_chunk_size = summary_chunk_size
         self.summary_model_token = summary_model_token
+
+        if self.clustering_algorithm not in ['dbscan', 'optics']:
+            raise ValueError("results: status must be one of ['dbscan', 'optics']")
 
         if summary_template is None:
             self.summary_template = DEFAULT_TEMPLATE
@@ -108,8 +113,8 @@ class ClusterClassifier:
         self.faiss_index = self.build_faiss_index(self.embeddings)
         logging.info("projecting with umap...")
         self.projections, self.umap_mapper = self.project(self.embeddings)
-        logging.info("dbscan clustering...")
-        self.cluster_labels = self.cluster(self.projections)
+        logging.info("clustering...")
+        self.cluster_labels = self.cluster(self.projections, self.clustering_algorithm)
 
         self.id2cluster = {
             index: label for index, label in enumerate(self.cluster_labels)
@@ -160,15 +165,25 @@ class ClusterClassifier:
         )
         return mapper.embedding_, mapper
 
-    def cluster(self, embeddings):
-        print(
-            f"Using DBSCAN (eps, nim_samples)=({self.dbscan_eps,}, {self.dbscan_min_samples})"
-        )
-        clustering = DBSCAN(
-            eps=self.dbscan_eps,
-            min_samples=self.dbscan_min_samples,
-            n_jobs=self.dbscan_n_jobs,
-        ).fit(embeddings)
+    def cluster(self, embeddings, clustering_algorithm):
+
+        if clustering_algorithm == 'dbscan':
+            print(
+                f"Using DBSCAN (eps, nim_samples)=({self.dbscan_eps,}, {self.min_samples})"
+            )
+            clustering = DBSCAN(
+                eps=self.dbscan_eps,
+                min_samples=self.min_samples,
+                n_jobs=self.dbscan_n_jobs,
+            ).fit(embeddings)
+
+        elif clustering_algorithm == 'optics':
+            print(
+                f"Using OPTICS (min_samples)=({self.min_samples})"
+            )
+            clustering = OPTICS(
+                min_samples=self.min_samples,
+            ).fit(embeddings)
 
         return clustering.labels_
 
