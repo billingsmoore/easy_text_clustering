@@ -14,13 +14,14 @@ The pipeline consists of several distinct blocks that can be customized and the 
 
 
 ## Install 
+
 Install the following libraries to get started:
 ```bash
 pip install scikit-learn umap-learn sentence_transformers faiss-cpu plotly matplotlib datasets
 ```
 Clone this repository and navigate to the folder:
 ```bash
-git clone https://github.com/huggingface/text-clustering.git
+git clone https://github.com/billingsmoore/text-clustering.git
 cd text-clustering
 ```
 
@@ -36,7 +37,7 @@ SAMPLE = 100_000
 
 texts = load_dataset("HuggingFaceTB/cosmopedia-100k", split="train").select(range(SAMPLE))["text"]
 
-cc = ClusterClassifier(embed_device="mps")
+cc = ClusterClassifier(clustering_algorithm='optics')
 
 # run the pipeline:
 embs, labels, summaries = cc.fit(texts)

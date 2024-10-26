@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.express as px
 from huggingface_hub import InferenceClient
 from sentence_transformers import SentenceTransformer
-from sklearn.cluster import DBSCAN, OPTICS
+from sklearn.cluster import DBSCAN, OPTICS, KMeans
 from tqdm import tqdm
 from umap import UMAP
 
@@ -41,6 +41,7 @@ class ClusterClassifier:
         umap_metric="cosine",
         dbscan_eps=0.08,
         min_samples=50,
+        n_clusters=8,
         dbscan_n_jobs=16,
         summary_create=True,
         summary_model="mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -65,6 +66,8 @@ class ClusterClassifier:
         self.min_samples = min_samples
         self.dbscan_n_jobs = dbscan_n_jobs
 
+        self.n_clusters = n_clusters
+
         self.summary_create = summary_create
         self.summary_model = summary_model
         self.topic_mode = topic_mode
@@ -72,8 +75,8 @@ class ClusterClassifier:
         self.summary_chunk_size = summary_chunk_size
         self.summary_model_token = summary_model_token
 
-        if self.clustering_algorithm not in ['dbscan', 'optics']:
-            raise ValueError("results: status must be one of ['dbscan', 'optics']")
+        if self.clustering_algorithm not in ['dbscan', 'optics', 'kmeans']:
+            raise ValueError("results: status must be one of ['dbscan', 'optics', 'kmeans']")
 
         if summary_template is None:
             self.summary_template = DEFAULT_TEMPLATE
@@ -99,9 +102,21 @@ class ClusterClassifier:
         )
         self.embed_model.max_seq_length = self.embed_max_seq_length
 
-    def fit(self, texts, embeddings=None):
-        self.texts = texts
+    def fit(self, 
+            texts=None, 
+            embeddings=None,
+            clustering_algorithm=None,
+            n_clusters=None,
+            dbscan_eps=None,
+            min_samples=None,
+            ):
+        self.texts = texts or self.texts
+        self.clustering_algorithm = clustering_algorithm or self.clustering_algorithm
+        self.n_clusters = n_clusters or self.n_clusters
+        self.dbscan_eps = dbscan_eps or self.dbscan_eps
+        self.min_samples = min_samples or self.min_samples
 
+        # preprocessing
         if embeddings is None:
             logging.info("embedding texts...")
             self.embeddings = self.embed(texts)
@@ -110,9 +125,12 @@ class ClusterClassifier:
             self.embeddings = embeddings
 
         logging.info("building faiss index...")
-        self.faiss_index = self.build_faiss_index(self.embeddings)
+        self.faiss_index = self.faiss_index or self.build_faiss_index(self.embeddings)
         logging.info("projecting with umap...")
-        self.projections, self.umap_mapper = self.project(self.embeddings)
+        if (self.projections is None) or (self.umap_mapper is None):
+            self.projections, self.umap_mapper = self.project(self.embeddings)
+
+        # clustering and summarization
         logging.info("clustering...")
         self.cluster_labels = self.cluster(self.projections, self.clustering_algorithm)
 
@@ -183,6 +201,14 @@ class ClusterClassifier:
             )
             clustering = OPTICS(
                 min_samples=self.min_samples,
+            ).fit(embeddings)
+
+        elif clustering_algorithm == 'kmeans':
+            print(
+                f"Using K-Means (n_clusters)=({self.n_clusters})"
+            )
+            clustering = KMeans(
+                n_clusters=self.n_clusters,
             ).fit(embeddings)
 
         return clustering.labels_
@@ -327,18 +353,31 @@ class ClusterClassifier:
 
         df["color"] = df["labels"].apply(lambda x: "C0" if x==-1 else f"C{(x%9)+1}")
 
-        df.plot(
-            kind="scatter",
-            x="X",
-            y="Y",
-            c="labels",
-            s=0.75,
-            alpha=0.8,
-            linewidth=0,
-            color=df["color"],
-            ax=ax,
-            colorbar=False,
-        )
+        try:
+            df.plot(
+                kind="scatter",
+                x="X",
+                y="Y",
+                c="labels",
+                s=0.75,
+                alpha=0.8,
+                linewidth=0,
+                color=df["color"],
+                ax=ax,
+                colorbar=False,
+            )
+        except:
+            df.plot(
+                kind="scatter",
+                x="X",
+                y="Y",
+                s=0.75,
+                alpha=0.8,
+                linewidth=0,
+                color=df["color"],
+                ax=ax,
+                colorbar=False,
+            )
 
         for label in self.cluster_summaries.keys():
             if label == -1:
