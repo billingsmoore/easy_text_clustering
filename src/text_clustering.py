@@ -104,7 +104,6 @@ class ClusterClassifier:
 
     def fit(self, 
             texts=None, 
-            embeddings=None,
             clustering_algorithm=None,
             n_clusters=None,
             dbscan_eps=None,
@@ -117,18 +116,21 @@ class ClusterClassifier:
         self.min_samples = min_samples or self.min_samples
 
         # preprocessing
-        if embeddings is None:
+        if self.embeddings is None:
             logging.info("embedding texts...")
             self.embeddings = self.embed(texts)
         else:
             logging.info("using precomputed embeddings...")
-            self.embeddings = embeddings
 
         logging.info("building faiss index...")
         self.faiss_index = self.faiss_index or self.build_faiss_index(self.embeddings)
-        logging.info("projecting with umap...")
-        if (self.projections is None) or (self.umap_mapper is None):
+
+        if self.projections is None:
+            logging.info("projecting with umap...")
             self.projections, self.umap_mapper = self.project(self.embeddings)
+        else:
+            logging.info("using precomputed projections...")
+
 
         # clustering and summarization
         logging.info("clustering...")
