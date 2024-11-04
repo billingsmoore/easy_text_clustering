@@ -15,6 +15,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import DBSCAN, OPTICS, KMeans
 from tqdm import tqdm
 from umap import UMAP
+from hdbscan import HDBSCAN
 
 logging.basicConfig(level=logging.INFO)
 
@@ -42,7 +43,7 @@ class ClusterClassifier:
         dbscan_eps=0.08,
         min_samples=50,
         n_clusters=8,
-        dbscan_n_jobs=16,
+        dbscan_n_jobs=1,
         summary_create=True,
         summary_model="mistralai/Mixtral-8x7B-Instruct-v0.1",
         topic_mode="multiple_topics",
@@ -75,8 +76,8 @@ class ClusterClassifier:
         self.summary_chunk_size = summary_chunk_size
         self.summary_model_token = summary_model_token
 
-        if self.clustering_algorithm not in ['dbscan', 'optics', 'kmeans']:
-            raise ValueError("results: status must be one of ['dbscan', 'optics', 'kmeans']")
+        if self.clustering_algorithm not in ['dbscan', 'hdbscan', 'optics', 'kmeans']:
+            raise ValueError("results: status must be one of ['dbscan', 'hdbscan', 'optics', 'kmeans']")
 
         if summary_template is None:
             self.summary_template = DEFAULT_TEMPLATE
@@ -175,21 +176,30 @@ class ClusterClassifier:
             show_progress_bar=True,
             convert_to_numpy=True,
             normalize_embeddings=True,
+            device='cuda:0'
         )
 
         return embeddings
 
-    def project(self, embeddings):
-        mapper = UMAP(n_components=self.umap_components, metric=self.umap_metric).fit(
-            embeddings
-        )
-        return mapper.embedding_, mapper
+    def project(self, embeddings, projection_algorithm='umap'):
+
+        if projection_algorithm == 'pca':
+            pass
+
+        elif projection_algorithm == 'umap':
+            mapper = UMAP(n_components=self.umap_components, metric=self.umap_metric).fit(
+                embeddings
+            )
+            return mapper.embedding_, mapper
+        
+        elif projection_algorithm == 'tsvd':
+            pass
 
     def cluster(self, embeddings, clustering_algorithm):
 
         if clustering_algorithm == 'dbscan':
             print(
-                f"Using DBSCAN (eps, nim_samples)=({self.dbscan_eps,}, {self.min_samples})"
+                f"Using DBSCAN (eps, num_samples)=({self.dbscan_eps,}, {self.min_samples})"
             )
             clustering = DBSCAN(
                 eps=self.dbscan_eps,
@@ -197,11 +207,11 @@ class ClusterClassifier:
                 n_jobs=self.dbscan_n_jobs,
             ).fit(embeddings)
 
-        elif clustering_algorithm == 'optics':
+        if clustering_algorithm == 'hdbscan':
             print(
-                f"Using OPTICS (min_samples)=({self.min_samples})"
+                f"Using HDBSCAN (num_samples)=({self.min_samples})"
             )
-            clustering = OPTICS(
+            clustering = HDBSCAN(
                 min_samples=self.min_samples,
             ).fit(embeddings)
 
@@ -211,6 +221,14 @@ class ClusterClassifier:
             )
             clustering = KMeans(
                 n_clusters=self.n_clusters,
+            ).fit(embeddings)
+
+        elif clustering_algorithm == 'optics':
+            print(
+                f"Using OPTICS (min_samples)=({self.min_samples})"
+            )
+            clustering = OPTICS(
+                min_samples=self.min_samples,
             ).fit(embeddings)
 
         return clustering.labels_
@@ -334,16 +352,29 @@ class ClusterClassifier:
             self.cluster_centers[label] = (x, y)
 
     def show(self, interactive=False):
-        df = pd.DataFrame(
-            data={
-                "X": self.projections[:, 0],
-                "Y": self.projections[:, 1],
-                "labels": self.cluster_labels,
-                "content_display": [
-                    textwrap.fill(txt[:1024], 64) for txt in self.texts
-                ],
-            }
-        )
+        if self.umap_components != 3:
+            df = pd.DataFrame(
+                data={
+                    "X": self.projections[:, 0],
+                    "Y": self.projections[:, 1],
+                    "labels": self.cluster_labels,
+                    "content_display": [
+                        textwrap.fill(txt[:1024], 64) for txt in self.texts
+                    ],
+                }
+            )
+        else:
+            df = pd.DataFrame(
+                data={
+                    "X": self.projections[:, 0],
+                    "Y": self.projections[:, 1],
+                    "Z": self.projections[:, 2],
+                    "labels": self.cluster_labels,
+                    "content_display": [
+                        textwrap.fill(txt[:1024], 64) for txt in self.texts
+                    ],
+                }
+            )
 
         if interactive:
             self._show_plotly(df)
@@ -398,16 +429,30 @@ class ClusterClassifier:
         ax.set_axis_off()
 
     def _show_plotly(self, df):
-        fig = px.scatter(
-            df,
-            x="X",
-            y="Y",
-            color="labels",
-            hover_data={"content_display": True, "X": False, "Y": False},
-            width=1600,
-            height=800,
-            color_continuous_scale="HSV",
-        )
+        if self.umap_components != 3:
+            fig = px.scatter(
+                df,
+                x="X",
+                y="Y",
+                color="labels",
+                hover_data={"content_display": True, "X": False, "Y": False},
+                width=1600,
+                height=800,
+                color_continuous_scale="HSV",
+            )
+        else:
+            print('showing 3d')
+            fig = px.scatter_3d(
+                df,
+                x="X",
+                y="Y",
+                z="Z",
+                color="labels",
+                hover_data={"content_display": True, "X": False, "Y": False},
+                width=1600,
+                height=800,
+                color_continuous_scale="HSV",
+            )
 
         fig.update_traces(hovertemplate="%{customdata[0]}<extra></extra>")
 
@@ -427,12 +472,22 @@ class ClusterClassifier:
             summary = self.cluster_summaries[label]
             position = self.cluster_centers[label]
 
-            fig.add_annotation(
-                x=position[0],
-                y=position[1],
-                text=summary,
-                showarrow=False,
-                yshift=0,
-            )
+            if self.umap_components != 3:
+                fig.add_annotation(
+                    x=position[0],
+                    y=position[1],
+                    text=summary,
+                    showarrow=False,
+                    yshift=0,
+                )
+            else:
+                fig.add_annotation(
+                    x=position[0],
+                    y=position[1],
+                    z=position[2],
+                    text=summary,
+                    showarrow=False,
+                    yshift=0,
+                )
 
         fig.show()
