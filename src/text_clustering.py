@@ -10,9 +10,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+
 from huggingface_hub import InferenceClient
 from sentence_transformers import SentenceTransformer
+
 from sklearn.cluster import DBSCAN, OPTICS, KMeans
+from sklearn.decomposition import TruncatedSVD, PCA
+
 from tqdm import tqdm
 from umap import UMAP
 from hdbscan import HDBSCAN
@@ -32,18 +36,16 @@ DEFAULT_TEMPLATE = "<s>[INST]{examples}\n\n{instruction}[/INST]"
 class ClusterClassifier:
     def __init__(
         self,
-        clustering_algorithm='dbscan',
+        batch_size = 1,
         embed_model_name="all-MiniLM-L6-v2",
         embed_device="cpu",
         embed_batch_size=64,
         embed_max_seq_length=512,
         embed_agg_strategy=None,
-        umap_components=2,
-        umap_metric="cosine",
-        dbscan_eps=0.08,
-        min_samples=50,
-        n_clusters=8,
-        dbscan_n_jobs=1,
+        projection_algorithm='umap',
+        projection_args = {},
+        clustering_algorithm='dbscan',
+        clustering_args = {},
         summary_create=True,
         summary_model="mistralai/Mixtral-8x7B-Instruct-v0.1",
         topic_mode="multiple_topics",
@@ -53,21 +55,24 @@ class ClusterClassifier:
         summary_template=None,
         summary_instruction=None,
     ):
-        self.clustering_algorithm = clustering_algorithm
+        
+        self.batch_size = batch_size
+        
         self.embed_model_name = embed_model_name
         self.embed_device = embed_device
         self.embed_batch_size = embed_batch_size
         self.embed_max_seq_length = embed_max_seq_length
         self.embed_agg_strategy = embed_agg_strategy
 
-        self.umap_components = umap_components
-        self.umap_metric = umap_metric
+        self.projection_algorithm = projection_algorithm
+        if self.projection_algorithm not in ['pca', 'tsvd', 'umap']:
+            raise ValueError("projection_algorithm must be one of ['pca', 'tsvd', 'umap']")
+        self.projection_args = projection_args
 
-        self.dbscan_eps = dbscan_eps
-        self.min_samples = min_samples
-        self.dbscan_n_jobs = dbscan_n_jobs
-
-        self.n_clusters = n_clusters
+        self.clustering_algorithm = clustering_algorithm
+        if self.clustering_algorithm not in ['dbscan', 'hdbscan', 'optics', 'kmeans']:
+            raise ValueError("clustering_algorithm must be one of ['dbscan', 'hdbscan', 'optics', 'kmeans']")
+        self.clustering_args = clustering_args
 
         self.summary_create = summary_create
         self.summary_model = summary_model
@@ -75,9 +80,6 @@ class ClusterClassifier:
         self.summary_n_examples = summary_n_examples
         self.summary_chunk_size = summary_chunk_size
         self.summary_model_token = summary_model_token
-
-        if self.clustering_algorithm not in ['dbscan', 'hdbscan', 'optics', 'kmeans']:
-            raise ValueError("results: status must be one of ['dbscan', 'hdbscan', 'optics', 'kmeans']")
 
         if summary_template is None:
             self.summary_template = DEFAULT_TEMPLATE
@@ -94,7 +96,7 @@ class ClusterClassifier:
         self.cluster_labels = None
         self.texts = None
         self.projections = None
-        self.umap_mapper = None
+        self.mapper = None
         self.id2label = None
         self.label2docs = None
 
@@ -104,19 +106,30 @@ class ClusterClassifier:
         self.embed_model.max_seq_length = self.embed_max_seq_length
 
     def fit(self, 
-            texts=None, 
+            texts=None,
+            batch_size = None, 
+            projection_algorithm=None,
+            projection_args=None,
             clustering_algorithm=None,
-            n_clusters=None,
-            dbscan_eps=None,
-            min_samples=None,
+            clustering_args = None
             ):
+        
+        # if batch size has changed, reset embeddings and projections
+        if (batch_size is not None) and (batch_size != self.batch_size):
+            self.embeddings = None
+            self.projections = None
+
+        self.batch_size = batch_size or self.batch_size
         self.texts = texts or self.texts
+        self.projection_algorithm = projection_algorithm or self.projection_algorithm
+        self.projection_args = projection_args or self.projection_args
         self.clustering_algorithm = clustering_algorithm or self.clustering_algorithm
-        self.n_clusters = n_clusters or self.n_clusters
-        self.dbscan_eps = dbscan_eps or self.dbscan_eps
-        self.min_samples = min_samples or self.min_samples
+        self.clustering_args = clustering_args or self.clustering_args
 
         # preprocessing
+        if batch_size > 1:
+            self.texts = self.batch_and_join(self.texts)
+
         if self.embeddings is None:
             logging.info("embedding texts...")
             self.embeddings = self.embed(texts)
@@ -128,28 +141,15 @@ class ClusterClassifier:
 
         if self.projections is None:
             logging.info("projecting with umap...")
-            self.projections, self.umap_mapper = self.project(self.embeddings)
+            self.projections, self.mapper = self.project(self.embeddings, self.projection_algorithm, self.projection_args)
         else:
             logging.info("using precomputed projections...")
 
-
-        # clustering and summarization
+        # clustering
         logging.info("clustering...")
-        self.cluster_labels = self.cluster(self.projections, self.clustering_algorithm)
+        self.cluster(self.projections, self.clustering_algorithm, self.clustering_args)
 
-        self.id2cluster = {
-            index: label for index, label in enumerate(self.cluster_labels)
-        }
-        self.label2docs = defaultdict(list)
-        for i, label in enumerate(self.cluster_labels):
-            self.label2docs[label].append(i)
-
-        self.cluster_centers = {}
-        for label in self.label2docs.keys():
-            x = np.mean([self.projections[doc, 0] for doc in self.label2docs[label]])
-            y = np.mean([self.projections[doc, 1] for doc in self.label2docs[label]])
-            self.cluster_centers[label] = (x, y)
-
+        # summarize clusters
         if self.summary_create:
             logging.info("summarizing cluster centers...")
             self.cluster_summaries = self.summarize(self.texts, self.cluster_labels)
@@ -169,6 +169,11 @@ class ClusterClassifier:
 
         return inferred_labels, embeddings
 
+    def batch_and_join(texts, n):
+        # Create batches of 'n' strings joined with new lines
+        batched_texts = ["\n".join(texts[i:i + n]) for i in range(0, len(texts), n)]
+        return batched_texts
+
     def embed(self, texts):
         embeddings = self.embed_model.encode(
             texts,
@@ -181,57 +186,83 @@ class ClusterClassifier:
 
         return embeddings
 
-    def project(self, embeddings, projection_algorithm='umap'):
+    def project(self, embeddings, projection_algorithm, projection_args):
+        self.projection_algorithm = projection_algorithm or self.projection_algorithm
 
         if projection_algorithm == 'pca':
-            pass
+            mapper = PCA(**projection_args)
+            projections = mapper.fit_transform(embeddings)
+
+            return projections, mapper
 
         elif projection_algorithm == 'umap':
-            mapper = UMAP(n_components=self.umap_components, metric=self.umap_metric).fit(
+            mapper = UMAP(**projection_args).fit(
                 embeddings
             )
             return mapper.embedding_, mapper
         
         elif projection_algorithm == 'tsvd':
-            pass
-
-    def cluster(self, embeddings, clustering_algorithm):
+            mapper = TruncatedSVD(**projection_args)
+            
+            projections = mapper.fit_transform(
+                    embeddings
+                )
+            
+            return projections, mapper
+            
+    def cluster(self, embeddings, clustering_algorithm, clustering_args):
 
         if clustering_algorithm == 'dbscan':
             print(
-                f"Using DBSCAN (eps, num_samples)=({self.dbscan_eps,}, {self.min_samples})"
+                f"Using DBSCAN params={clustering_args}"
             )
             clustering = DBSCAN(
-                eps=self.dbscan_eps,
-                min_samples=self.min_samples,
-                n_jobs=self.dbscan_n_jobs,
+                **clustering_args
             ).fit(embeddings)
 
         if clustering_algorithm == 'hdbscan':
             print(
-                f"Using HDBSCAN (num_samples)=({self.min_samples})"
+                f"Using HDBSCAN params={clustering_args}"
             )
             clustering = HDBSCAN(
-                min_samples=self.min_samples,
+                **clustering_args,
             ).fit(embeddings)
 
         elif clustering_algorithm == 'kmeans':
             print(
-                f"Using K-Means (n_clusters)=({self.n_clusters})"
+                f"Using K-Means params={clustering_args}"
             )
             clustering = KMeans(
-                n_clusters=self.n_clusters,
+                **clustering_args
             ).fit(embeddings)
 
         elif clustering_algorithm == 'optics':
             print(
-                f"Using OPTICS (min_samples)=({self.min_samples})"
+                f"Using OPTICS params={clustering_args}"
             )
             clustering = OPTICS(
-                min_samples=self.min_samples,
+                **clustering_args,
             ).fit(embeddings)
 
-        return clustering.labels_
+        
+        self.store_cluster_info(clustering.labels_)
+
+    def store_cluster_info(self, cluster_labels):
+
+        self.cluster_labels = cluster_labels
+
+        self.id2cluster = {
+            index: label for index, label in enumerate(self.cluster_labels)
+        }
+        self.label2docs = defaultdict(list)
+        for i, label in enumerate(self.cluster_labels):
+            self.label2docs[label].append(i)
+
+        self.cluster_centers = {}
+        for label in self.label2docs.keys():
+            x = np.mean([self.projections[doc, 0] for doc in self.label2docs[label]])
+            y = np.mean([self.projections[doc, 1] for doc in self.label2docs[label]])
+            self.cluster_centers[label] = (x, y)
 
     def build_faiss_index(self, embeddings):
         index = faiss.IndexFlatL2(embeddings.shape[1])
