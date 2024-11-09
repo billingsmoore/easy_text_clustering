@@ -108,7 +108,7 @@ Object with parameters for embedding generation, dimensionality reduction, clust
 ```python
 # Example usage
 my_clusterer = ClusterClassifier(
-    batch_size=32,
+    batch_size=16,
     embed_model_name="all-MiniLM-L6-v2",
     clustering_algorithm="kmeans",
     clustering_args={'n_clusters': 5},
@@ -300,8 +300,8 @@ Here's the documentation for the `show` method:
 
 #### Notes:
 
-- If the `umap_components` is set to 3, a 3D plot is created, where `X`, `Y`, and `Z` represent the projections in 3-dimensional space.
-- If `umap_components` is not 3, a 2D plot is created, with `X` and `Y` representing the projections in 2-dimensional space.
+- If the number of componenets in the projections is 3 or more, a 3D plot is created, where `X`, `Y`, and `Z` represent the projections in 3-dimensional space.
+- If  number of componenets in the projections is 2, a 2D plot is created, with `X` and `Y` representing the projections in 2-dimensional space.
 - The content of each data point (up to 1024 characters) is displayed in the plot, with long text wrapped to fit within the plot's space.
 - The `labels` represent the cluster labels for each data point.
 - The function relies on the `projections` (data points' projections), `cluster_labels` (assigned clusters), and `texts` (the content for each data point).

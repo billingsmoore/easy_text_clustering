@@ -12,6 +12,7 @@ This project is a fork of ['huggingface/text-clustering'](https://github.com/hug
 3. Visualizations can now be done interactively in 3 dimensions.
 4. The pipeline can be run and re-run with new hyperparameters, or even new algorithm selections for projections and/or clustering without having to re-perform computationally expensive embedding or projections unnecessarily. 
 5. Texts can be batched into groups prior to clustering.
+6. A simple automated test suite has been added to the repo.
 
 Additionally, a substantial amount of documentation has been added to this repository for both the new functionality and the original functionality, improving readability and usability. This documentation is available as comments in the code and in a standalone document.
 
@@ -65,7 +66,7 @@ Load classifier and run inference:
 ```python
 from src.text_clustering import ClusterClassifier
 
-cc = ClusterClassifier(embed_device="mps")
+cc = ClusterClassifier()
 
 # load state
 cc.load("./cc_100k")
@@ -117,7 +118,7 @@ cc = ClusterClassifier(
     clustering_args={'n_clusters': 2, 'random_state': 0, 'n_init': "auto"})
 
 # run the pipeline:
-cc.fit()
+cc.fit(texts)
 
 # show the results
 cc.show()
