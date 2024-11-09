@@ -112,9 +112,9 @@ texts = load_dataset("HuggingFaceTB/cosmopedia-100k", split="train").select(rang
 # also set the clustering to use KMeans clustering with appropriate params
 cc = ClusterClassifier(
     projection_algorithm='tsvd', 
-    projection_args={n_components=5, n_iter=7, random_state=42},
+    projection_args={'n_components': 5, 'n_iter': 7, 'random_state': 42},
     clustering_algorithm='kmeans',
-    clustering_args={n_clusters=2, random_state=0, n_init="auto"})
+    clustering_args={'n_clusters': 2, 'random_state': 0, 'n_init': "auto"})
 
 # run the pipeline:
 cc.fit()
@@ -125,15 +125,15 @@ cc.show()
 # if results are unsatisfactory, refit with new selections
 cc.fit(
     projection_algorithm='pca', 
-    projection_args={n_components=3},
+    projection_args={'n_components': 3},
     clustering_algorithm='hdbscan',
-    clustering_args={min_cluster_size=10})
+    clustering_args={'min_cluster_size': 10})
 
 cc.show()
 
 
 # still unsatisfied? you can keep projections, but change clustering params
-cc.fit(clustering_args={min_cluster_size=25})
+cc.fit(clustering_args={'min_cluster_size': 25})
 
 cc.show()
 

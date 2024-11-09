@@ -126,7 +126,7 @@ my_clusterer.save("./cluster_classifier_5_clusters")
 
 ## Methods
 
-### fit (texts=None, batch_size=None, projection_algorithm=None, projection_args=None, clustering_algorithm=None, clustering_args=None)
+### fit ( texts=None, batch_size=None, projection_algorithm=None, projection_args=None, clustering_algorithm=None, clustering_args=None )
 
     Perform the complete process of fitting the model, which includes embedding the texts, projecting the embeddings into a lower-dimensional space, clustering the projections, and optionally summarizing the clusters.
 
