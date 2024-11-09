@@ -203,9 +203,9 @@ class ClusterClassifier:
         self.clustering_args = clustering_args or self.clustering_args
 
         # Preprocess the texts if batch size > 1
-        if batch_size > 1:
+        if self.batch_size > 1:
             logging.info("Batching texts...")
-            self.texts = self.batch_and_join(self.texts)
+            self.texts = self.batch_and_join(self.texts, self.batch_size)
 
         # Embedding generation: either from scratch or using precomputed embeddings
         if self.embeddings is None:
@@ -263,7 +263,7 @@ class ClusterClassifier:
 
         return inferred_labels, embeddings
 
-    def batch_and_join(texts, n):
+    def batch_and_join(self, texts, n):
 
         """
         Groups a list of text strings into batches of 'n' items, with each batch containing 'n' strings joined by newline characters.
@@ -298,7 +298,6 @@ class ClusterClassifier:
             show_progress_bar=True,                # Display a progress bar for embedding generation
             convert_to_numpy=True,                 # Convert embeddings to a NumPy array format
             normalize_embeddings=True,             # Normalize embeddings to unit length
-            device='cuda:0'                        # Use GPU (if available) for faster processing
         )
 
         return embeddings
@@ -712,8 +711,8 @@ class ClusterClassifier:
             None
 
         Notes:
-            - If the `umap_components` is 3, a 3D plot is created, where `X`, `Y`, and `Z` represent the projections in 3-dimensional space.
-            - If the `umap_components` is not 3, a 2D plot is created, with `X` and `Y` representing the projections in 2-dimensional space.
+            - If the number of components in self.projections is 3 or more, a 3D plot is created, where `X`, `Y`, and `Z` represent the projections in 3-dimensional space.
+            - If the number of components in self.projections is 2, a 2D plot is created, with `X` and `Y` representing the projections in 2-dimensional space.
             - The content of each data point (up to 1024 characters) is displayed in the plot, with long text wrapped to fit within the plot's space.
             - The `labels` represent the cluster labels for each data point.
             - The function relies on the `projections` (data points' projections), `cluster_labels` (assigned clusters), and `texts` (the content for each data point).
@@ -724,7 +723,7 @@ class ClusterClassifier:
         """
 
         # Prepare the DataFrame based on the number of UMAP components (2D or 3D projection)
-        if self.umap_components != 3:
+        if len(self.projections[0]) == 2:
             df = pd.DataFrame(
                 data={
                     "X": self.projections[:, 0],
@@ -856,7 +855,7 @@ class ClusterClassifier:
 
         Notes:
             - If the projection has two components, a 2D scatter plot will be generated.
-            - If the projection has three components (`umap_components == 3`), a 3D scatter plot will be generated.
+            - If the projection has three components, a 3D scatter plot will be generated.
             - Each point in the plot represents a data point and is color-coded by its assigned cluster label.
             - Hovering over the points displays the content associated with that point.
             - If available, cluster summaries will be displayed at the center of each cluster as text annotations.
@@ -868,7 +867,7 @@ class ClusterClassifier:
             - The cluster summaries are displayed at the cluster center with `text` annotations.
 
         Exception Handling:
-            - If the projection has three components (`umap_components == 3`), the plot will be rendered in 3D.
+            - If the projection has three components, the plot will be rendered in 3D.
             - Otherwise, the plot will be 2D, using `X` and `Y` for the axes.
 
         Example Usage:
@@ -876,7 +875,7 @@ class ClusterClassifier:
         """
         
         # Check if the projection has 3 components or less and plot accordingly
-        if self.umap_components != 3:
+        if len(self.projections[0]) == 2:
             fig = px.scatter(
                 df,
                 x="X",
@@ -922,7 +921,7 @@ class ClusterClassifier:
             summary = self.cluster_summaries[label]
             position = self.cluster_centers[label]
 
-            if self.umap_components != 3:
+            if len(self.projections[0]) == 2:
                 fig.add_annotation(
                     x=position[0],
                     y=position[1],
