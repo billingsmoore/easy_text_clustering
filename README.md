@@ -28,14 +28,9 @@ As was true in the original repo, users can choose alternative models for Embedd
 
 ## Install 
 
-Install the following libraries to get started:
+Install the library to get started:
 ```bash
-pip install scikit-learn umap-learn sentence_transformers faiss-cpu plotly matplotlib datasets
-```
-Clone this repository and navigate to the folder:
-```bash
-git clone https://github.com/billingsmoore/text-clustering.git
-cd text-clustering
+pip install --upgrade easy_text_clustering
 ```
 
 ## Basic Usage
@@ -43,7 +38,7 @@ cd text-clustering
 Run pipeline and visualize results:
 
 ```python
-from src.text_clustering import ClusterClassifier
+from easy_text_clustering.src.clusterer import ClusterClassifier
 from datasets import load_dataset
 
 SAMPLE = 100_000
@@ -64,7 +59,7 @@ cc.save("./cc_100k")
 
 Load classifier and run inference:
 ```python
-from src.text_clustering import ClusterClassifier
+from easy_text_clustering.src.clusterer import ClusterClassifier
 
 cc = ClusterClassifier()
 
@@ -102,7 +97,7 @@ If you would like to customize the plotting further the easiest way is to custom
 ## Advanced Usage
 
 ```python
-from src.text_clustering import ClusterClassifier
+from easy_text_clustering.src.clusterer import ClusterClassifier
 from datasets import load_dataset
 
 SAMPLE = 100_000
