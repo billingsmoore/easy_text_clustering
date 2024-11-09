@@ -19,7 +19,7 @@ dependencies=[
 ]
 
 name = "easy_text_clustering"
-version = "0.0.4"
+version = "1.0.0"
 authors = [
   { name="billingsmoore", email="billingsmoore@gmail.com" },
 ]

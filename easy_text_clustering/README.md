@@ -141,22 +141,3 @@ cc.show()
 # save when done
 cc.save("./cc_100k")
 ```
-
-## Command Line Usage
-
-You can also run the pipeline using a script with:
-```bash
-# run a new pipeline
-python run_pipeline.py --mode run  --save_load_path './cc_100k' --n_samples 100000 --build_hf_ds
-# load existing pipeline
-python run_pipeline.py --mode load --save_load_path './cc_100k' --build_hf_ds
-# inference mode on new texts from an input dataset
-python run_pipeline.py --mode infer --save_load_path './cc_100k'  --n_samples <NB_INFERENCE_SAMPLES> --input_dataset <HF_DATA_FOR_INFERENCE>
-```
-The `build_hf_ds` flag builds and pushes HF datasets, for the files and clusters, that can be directly used in the FW visualization space. In `infer` mode, we push the clusters dataset by default.
-
-You can also change how the clusters are labeled (multiple topics (default) vs single topic with an educational score) using the flag `--topic_mode`.
-
-## Examples
-
-Check the `examples` folder for an example of clustering and topic labeling applied to the [AutoMathText](https://huggingface.co/datasets/math-ai/AutoMathText/) dataset, utilizing [Cosmopedia](https://huggingface.co/datasets/HuggingFaceTB/cosmopedia)'s web labeling approach.
