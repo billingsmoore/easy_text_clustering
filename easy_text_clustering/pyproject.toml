@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+dependencies=[
+    "datasets",
+    "hdbscan",
+    "huggingface_hub",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "plotly",
+    "seaborn",
+    "sentence_transformers", 
+    "scikit-learn",
+    "tqdm",
+    "umap-learn"
+]
+
+name = "easy_text_clustering"
+version = "0.0.4"
+authors = [
+  { name="billingsmoore", email="billingsmoore@gmail.com" },
+]
+description = "User-friendly, low-code text clustering"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/*"]
+
+[project.urls]
+Homepage = "https://github.com/billingsmoore/easy_text_clustering"
+Issues = "https://github.com/billingsmoore/easy_text_clustering/issues"
