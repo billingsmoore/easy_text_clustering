@@ -5,7 +5,7 @@ This repository contains tools to easily embed and cluster texts as well as labe
 <center><img src="https://cdn-uploads.huggingface.co/production/uploads/61c141342aac764ce1654e43/jMKGaE_UnEfH3j8iZYXVN.png"></center>
 <center>Clustering of texts in the <a href="https://huggingface.co/datasets/HuggingFaceTB/cosmopedia">Cosmopedia dataset</a>.</center>
 
-This project is a fork of ['huggingface/text-clustering'](https://github.com/huggingface/text-clustering). The following changes have been made:
+This project is a fork of ['huggingface/text-clustering'](https://github.com/huggingface/text-clustering). All images in this README come from their repo. The following changes have been made to the codebase:
 
 1. Projection and clustering algorithms can now be selected by the user as appropriate for their use-case.
 2. Each algorithm's relevant hyperparamaters can be provided by the user as a dictionary, without having to store all possible hyperparameters.
