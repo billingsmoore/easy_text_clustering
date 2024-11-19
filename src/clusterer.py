@@ -4,22 +4,24 @@ import os
 import random
 import textwrap
 from collections import Counter, defaultdict
-
 import faiss
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+
 import plotly.express as px
 
 from huggingface_hub import InferenceClient
 from sentence_transformers import SentenceTransformer
 
-from sklearn.cluster import DBSCAN, OPTICS, KMeans
+from umap import UMAP
 from sklearn.decomposition import TruncatedSVD, PCA
 
-from tqdm import tqdm
-from umap import UMAP
-from hdbscan import HDBSCAN
+from sklearn.cluster import DBSCAN, OPTICS, KMeans, HDBSCAN
+
+from sklearn.metrics import silhouette_score
+import optuna
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,14 +39,16 @@ class ClusterClassifier:
     def __init__(
         self,
         batch_size = 1,
+        sample_size = 100_000,
         embed_model_name="all-MiniLM-L6-v2",
         embed_device="cpu",
         embed_batch_size=64,
         embed_max_seq_length=512,
         embed_agg_strategy=None,
+        optimization_trials=20,
         projection_algorithm='umap',
         projection_args = {},
-        clustering_algorithm='dbscan',
+        clustering_algorithm='hdbscan',
         clustering_args = {},
         summary_create=True,
         summary_model="mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -66,6 +70,7 @@ class ClusterClassifier:
             embed_batch_size (int): Number of samples per batch during embedding generation (default is 64).
             embed_max_seq_length (int): Maximum sequence length for the embedding model (default is 512).
             embed_agg_strategy (str, optional): Aggregation strategy for embeddings (e.g., 'mean', 'sum', or None).
+            optimization_trials (int): Number of trials to run during optimization
             projection_algorithm (str): Algorithm for dimensionality reduction. Options are 'pca', 'tsvd', or 'umap' (default is 'umap').
             projection_args (dict): Additional arguments for the projection algorithm (default is an empty dictionary).
             clustering_algorithm (str): Clustering algorithm to use. Options are 'dbscan', 'hdbscan', 'optics', 'kmeans' (default is 'dbscan').
@@ -104,6 +109,7 @@ class ClusterClassifier:
         """
         
         self.batch_size = batch_size
+        self.sample_size = sample_size
         
         # Embedding model parameters
         self.embed_model_name = embed_model_name
@@ -111,6 +117,9 @@ class ClusterClassifier:
         self.embed_batch_size = embed_batch_size
         self.embed_max_seq_length = embed_max_seq_length
         self.embed_agg_strategy = embed_agg_strategy
+
+        # Optimization parameters
+        self.optimization_trials = optimization_trials
 
         # Projection algorithm parameters (e.g., UMAP, PCA)
         self.projection_algorithm = projection_algorithm
@@ -236,8 +245,6 @@ class ClusterClassifier:
         else:
             self.cluster_summaries = None
 
-        return self.embeddings, self.cluster_labels, self.cluster_summaries
-
     def infer(self, texts, top_k=1):
 
         """
@@ -302,7 +309,110 @@ class ClusterClassifier:
 
         return embeddings
 
-    def project(self, embeddings, projection_algorithm, projection_args):
+    def optimize(self, texts=None, optimization_trials=None, sample_size=None):
+        """
+        Optimizes hyperparameters for dimensionality reduction (UMAP) and clustering (HDBSCAN) using Optuna.
+        This method maximizes the silhouette score, which evaluates clustering quality.
+        
+        Args:
+            texts (list, optional): A list of input texts to embed and optimize. If provided and different
+                                    from `self.texts`, it replaces the current `self.texts`, and embeddings 
+                                    are recalculated. Defaults to None (uses `self.texts`).
+            optimization_trials (int, optional): The number of optimization trials to perform. If not provided,
+                                                the value of `self.optimization_trials` is used. Defaults to None.
+        
+        Returns:
+            None
+        """
+        # Use provided optimization trials, or default to the instance's optimization_trials value
+        self.optimization_trials = optimization_trials or self.optimization_trials
+        self.sample_size = sample_size or self.sample_size
+
+        # If new texts are provided and differ from the current texts, update and reset embeddings
+        if texts is not None and texts is not self.texts:
+            self.texts = texts
+            self.embeddings = None  # Reset embeddings since the input texts have changed
+
+        # If embeddings are not already computed, generate them
+        if self.embeddings is None:
+            self.embeddings = self.embed(self.texts)
+
+        if len(self.embeddings) > self.sample_size:
+            data = random.sample(self.embeddings, sample_size)
+        else:
+            data = self.embeddings
+
+        # Define the objective function for Optuna optimization
+        def objective(trial):
+            # Suggest UMAP hyperparameters
+            n_neighbors = trial.suggest_int('umap_n_neighbors', 5, 50)  # Number of neighbors for UMAP
+            min_dist = trial.suggest_float('umap_min_dist', 0.0, 1.0)  # Minimum distance for UMAP
+            metric = trial.suggest_categorical('umap_metric', ['euclidean', 'cosine'])  # Metric for UMAP
+
+            # Suggest HDBSCAN hyperparameters
+            min_cluster_size = trial.suggest_int('hdbscan_min_cluster_size', 5, 100)  # Minimum cluster size
+            min_samples = trial.suggest_int('hdbscan_min_samples', 1, 10)  # Minimum samples for a core point
+            hdbscan_metric = trial.suggest_categorical('hdbscan_metric', ['euclidean', 'cosine'])  # Metric for HDBSCAN
+
+            # Apply UMAP for dimensionality reduction
+            umap_model = UMAP(n_neighbors=n_neighbors, min_dist=min_dist, metric=metric)
+            umap_embedding = umap_model.fit_transform(data)
+
+            # Apply HDBSCAN for clustering
+            hdbscan_model = HDBSCAN(min_cluster_size=min_cluster_size, 
+                                    min_samples=min_samples, 
+                                    metric=hdbscan_metric)
+            cluster_labels = hdbscan_model.fit_predict(umap_embedding)
+
+            # Evaluate clustering performance using the silhouette score
+            # Silhouette score requires at least 2 clusters; handle single-cluster cases
+            if len(np.unique(cluster_labels)) > 1:
+                score = silhouette_score(umap_embedding, cluster_labels)
+            else:
+                score = -1  # Assign a low score for poor clustering results (e.g., single cluster)
+
+            return score
+
+        # Create and optimize an Optuna study
+        study = optuna.create_study(direction='maximize')  # Maximize the silhouette score
+        study.optimize(objective, n_trials=self.optimization_trials)
+
+        # Print the best parameters and corresponding score
+        print("Best Parameters:", study.best_params)
+        print("Best Score:", study.best_value)
+
+        # Update projection and clustering algorithms with the optimized parameters
+        self.projection_algorithm = 'umap'
+        self.projection_args = {'n_neighbors': study.best_params['umap_n_neighbors'], 
+                                'min_dist': study.best_params['umap_min_dist'], 
+                                'metric': study.best_params['umap_metric']}
+        self.clustering_algorithm = 'hdbscan'
+        self.clustering_args = {'min_cluster_size': study.best_params['hdbscan_min_cluster_size'], 
+                                'min_samples': study.best_params['hdbscan_min_samples'], 
+                                'metric': study.best_params['hdbscan_metric']}
+
+    def optimize_fit(self, texts=None, optimization_trials=None):
+        """
+        Combines optimization and fitting in a single method. 
+        First, it optimizes hyperparameters for dimensionality reduction and clustering using Optuna.
+        Then, it fits the model with the optimized parameters on the provided or existing texts.
+
+        Args:
+            texts (list, optional): A list of input texts to process. If provided, it overrides the 
+                                    current `self.texts`. Defaults to None (uses `self.texts`).
+            optimization_trials (int, optional): The number of optimization trials for hyperparameter 
+                                                tuning. Defaults to None (uses `self.optimization_trials`).
+
+        Returns:
+            None
+        """
+        # Step 1: Perform optimization to find the best hyperparameters
+        self.optimize(texts, optimization_trials)
+
+        # Step 2: Fit the model using the optimized parameters
+        self.fit(texts)
+
+    def project(self, embeddings, projection_algorithm, projection_args, sample_size=None):
         """
         Projects embeddings into a lower-dimensional space using a specified dimensionality reduction algorithm.
 
@@ -325,6 +435,7 @@ class ClusterClassifier:
 
         # Set or update the projection algorithm to be used
         self.projection_algorithm = projection_algorithm or self.projection_algorithm
+        self.sample_size = sample_size or self.sample_size
 
         if projection_algorithm == 'pca':
             mapper = PCA(**projection_args)            # Initialize PCA with specified arguments
@@ -332,8 +443,13 @@ class ClusterClassifier:
             return projections, mapper
 
         elif projection_algorithm == 'umap':
-            mapper = UMAP(**projection_args).fit(embeddings)  # Fit UMAP model to embeddings
-            return mapper.embedding_, mapper                  # Return UMAP projections and the model instance
+            if len(embeddings) <= self.sample_size:
+                mapper = UMAP(**projection_args).fit(embeddings)  # Fit UMAP model to embeddings
+                return mapper.embedding_, mapper                  # Return UMAP projections and the model instance
+            else:
+                mapper = UMAP(**projection_args).fit(random.sample(embeddings, sample_size))
+                projections = mapper.transform(embeddings)
+                return projections, mapper
 
         elif projection_algorithm == 'tsvd':
             mapper = TruncatedSVD(**projection_args)    # Initialize Truncated SVD with specified arguments

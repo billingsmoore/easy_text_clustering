@@ -7,7 +7,7 @@ init(autoreset=True)
 # Add the src directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
-from text_clustering import ClusterClassifier
+from clusterer import ClusterClassifier
 
 failures = 0
 
@@ -130,7 +130,7 @@ TEXTS = sample_strings = [
 
 def readme_basic_fit():
     # run the pipeline:
-    embs, labels, summaries = cc.fit(TEXTS)
+    cc.fit(TEXTS)
     # show the results
     cc.show()
     # save 
@@ -188,13 +188,27 @@ def doc_class_example():
     )
 
     # Fit the model to the texts and get the embeddings, labels, and summaries
-    embeddings, labels, summaries = my_clusterer.fit(TEXTS)
+    my_clusterer.fit(TEXTS)
 
     # Visualize the clustering results
     my_clusterer.show()
 
     # Save the model
     my_clusterer.save("temp/cluster_classifier_5_clusters")
+
+def doc_optimize():
+    cluster_classifier = ClusterClassifier()
+    cluster_classifier.optimize(
+    texts=TEXTS,
+    optimization_trials=2
+)
+    
+def doc_optimize_fit():
+    # Initialize the clustering object
+    my_clusterer = ClusterClassifier()
+
+    # Perform optimization and fitting
+    my_clusterer.optimize_fit(texts=TEXTS, optimization_trials=2)
 
 def doc_infer():
     inferred_labels, embeddings = cc.infer(TEXTS, top_k=3)
@@ -232,6 +246,8 @@ def main():
     test_func(readme_advanced)
 
     test_func(doc_class_example)
+    test_func(doc_optimize_fit)
+    test_func(doc_optimize)
     test_func(doc_infer)
     test_func(doc_save)
     test_func(doc_load)
