@@ -25,7 +25,7 @@ pip install --upgrade easy_text_clustering
 The suggested way to use this module is to follow the code block below.
 
 ```python
-from easy_text_clustering.src.clusterer import ClusterClassifier
+from easy_text_clustering.clusterer import ClusterClassifier
 from datasets import load_dataset
 
 SAMPLE = 900 # select the number of samples from the data that you'd like to use
@@ -49,7 +49,7 @@ cc.save('./clustering-results')
 Run pipeline and visualize results:
 
 ```python
-from easy_text_clustering.src.clusterer import ClusterClassifier
+from easy_text_clustering.clusterer import ClusterClassifier
 from datasets import load_dataset
 
 SAMPLE = 900
@@ -70,7 +70,7 @@ cc.save("./clustering-results")
 
 Load classifier and run inference:
 ```python
-from easy_text_clustering.src.clusterer import ClusterClassifier
+from easy_text_clustering.clusterer import ClusterClassifier
 
 cc = ClusterClassifier()
 
@@ -110,7 +110,7 @@ If you would like to customize the plotting further the easiest way is to custom
 You can fit and refit with your preferred algorithms and hyperparameters as shown below.
 
 ```python
-from easy_text_clustering.src.clusterer import ClusterClassifier
+from easy_text_clustering.clusterer import ClusterClassifier
 from datasets import load_dataset
 
 SAMPLE = 900
