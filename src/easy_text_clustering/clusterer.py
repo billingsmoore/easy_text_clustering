@@ -338,7 +338,7 @@ class ClusterClassifier:
             self.embeddings = self.embed(self.texts)
 
         if len(self.embeddings) > self.sample_size:
-            data = random.sample(self.embeddings, sample_size)
+            data = random.sample(list(self.embeddings), self.sample_size)
         else:
             data = self.embeddings
 
@@ -374,8 +374,16 @@ class ClusterClassifier:
             return score
 
         # Create and optimize an Optuna study
-        study = optuna.create_study(direction='maximize')  # Maximize the silhouette score
-        study.optimize(objective, n_trials=self.optimization_trials)
+        while True:
+            try:
+                study = optuna.create_study(direction='maximize')  # Maximize the silhouette score
+                study.optimize(objective, n_trials=self.optimization_trials)
+                break
+            except:
+                # if study fails, retry with 80% of sample size
+                print(f'Study failed with sample size: {self.sample_size}')
+                self.sample_size = self.sample_size // (self.sample_size * 1.25)
+                print(f'Re-trying with sample size: {self.sample_size}')
 
         # Print the best parameters and corresponding score
         print("Best Parameters:", study.best_params)
@@ -391,7 +399,7 @@ class ClusterClassifier:
                                 'min_samples': study.best_params['hdbscan_min_samples'], 
                                 'metric': study.best_params['hdbscan_metric']}
 
-    def optimize_fit(self, texts=None, optimization_trials=None):
+    def optimize_fit(self, texts=None, optimization_trials=None, sample_size=None):
         """
         Combines optimization and fitting in a single method. 
         First, it optimizes hyperparameters for dimensionality reduction and clustering using Optuna.
@@ -407,7 +415,7 @@ class ClusterClassifier:
             None
         """
         # Step 1: Perform optimization to find the best hyperparameters
-        self.optimize(texts, optimization_trials)
+        self.optimize(texts, optimization_trials, sample_size)
 
         # Step 2: Fit the model using the optimized parameters
         self.fit(texts)
@@ -447,8 +455,30 @@ class ClusterClassifier:
                 mapper = UMAP(**projection_args).fit(embeddings)  # Fit UMAP model to embeddings
                 return mapper.embedding_, mapper                  # Return UMAP projections and the model instance
             else:
-                mapper = UMAP(**projection_args).fit(random.sample(embeddings, sample_size))
-                projections = mapper.transform(embeddings)
+                # Fit UMAP model on a random sample
+                mapper = UMAP(**projection_args).fit(random.sample(list(embeddings), self.sample_size))
+
+                num_embeddings = len(embeddings)
+                embedding_dim = mapper.embedding_.shape[1]  # Get the dimensionality of the projections
+                num_batches = (num_embeddings - self.sample_size) // self.sample_size  # Calculate number of batches
+
+                # Initialize an empty NumPy array for projections
+                projections = np.zeros((num_embeddings, embedding_dim))
+
+                start = 0
+                end = self.sample_size
+
+                # Use tqdm to show progress over batches
+                for batch_idx in tqdm(range(num_batches), desc="Projecting embeddings"):
+                    batch_projection = mapper.transform(embeddings[start:end])
+                    projections[start:end] = batch_projection
+                    start = end
+                    end += self.sample_size
+
+                # Handle remaining embeddings if any
+                if start < num_embeddings:
+                    projections[start:] = mapper.transform(embeddings[start:])
+
                 return projections, mapper
 
         elif projection_algorithm == 'tsvd':

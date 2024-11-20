@@ -9,10 +9,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 
 from clusterer import ClusterClassifier
 
-failures = 0
-
-cc = ClusterClassifier()
-
 TEXTS = sample_strings = [
     "The quick brown fox jumps over the lazy dog.",
     "A journey of a thousand miles begins with a single step.",
@@ -128,140 +124,8 @@ TEXTS = sample_strings = [
     "Life’s too short to waste time."
 ]
 
-def readme_basic_fit():
-    # run the pipeline:
-    cc.fit(TEXTS)
-    # show the results
-    cc.show()
-    # save 
-    cc.save("temp/cc_100k")
-
-def readme_basic_inference():
-    cc = ClusterClassifier()
-    # load state
-    cc.load("temp/cc_100k")
-    # visualize
-    cc.show()
-    # classify new texts with k-nearest neighbour search
-    cluster_labels, embeddings = cc.infer(TEXTS, top_k=1)
-
-def readme_advanced():
-    # initialize the ClusterClassifier to use TruncatedSVD with appropriate params
-    # also set the clustering to use KMeans clustering with appropriate params
-    cc = ClusterClassifier(
-        projection_algorithm='tsvd', 
-        projection_args={'n_components': 5, 'n_iter': 7, 'random_state': 42},
-        clustering_algorithm='kmeans',
-        clustering_args={'n_clusters': 2, 'random_state': 0, 'n_init': "auto"})
-
-    # run the pipeline:
-    cc.fit(TEXTS)
-
-    # show the results
-    cc.show()
-
-    # if results are unsatisfactory, refit with new selections
-    cc.fit(
-        projection_algorithm='pca', 
-        projection_args={'n_components': 3},
-        clustering_algorithm='hdbscan',
-        clustering_args={'min_cluster_size': 10})
-
-    cc.show()
-
-
-    # still unsatisfied? you can keep projections, but change clustering params
-    cc.fit(clustering_args={'min_cluster_size': 25})
-
-    cc.show()
-
-    # save when done
-    cc.save("temp/cc_100k")
-
-def doc_class_example():
-    # Example usage
-    my_clusterer = ClusterClassifier(
-        batch_size=16,
-        embed_model_name="all-MiniLM-L6-v2",
-        clustering_algorithm="kmeans",
-        clustering_args={'n_clusters': 5},
-    )
-
-    # Fit the model to the texts and get the embeddings, labels, and summaries
-    my_clusterer.fit(TEXTS)
-
-    # Visualize the clustering results
-    my_clusterer.show()
-
-    # Save the model
-    my_clusterer.save("temp/cluster_classifier_5_clusters")
-
-def doc_optimize():
-    cluster_classifier = ClusterClassifier(summary_create=False)
-    cluster_classifier.optimize(
-    texts=TEXTS,
-    optimization_trials=2
-)
-    
-def doc_optimize_fit():
-    # Initialize the clustering object
-    my_clusterer = ClusterClassifier(summary_create=False)
-
-    # Perform optimization and fitting
-    my_clusterer.optimize_fit(texts=TEXTS, optimization_trials=2)
-
 def optimize_with_sample():
     cc = ClusterClassifier(summary_create=False)
     cc.optimize_fit(TEXTS, 2, sample_size=25)
 
-def doc_infer():
-    inferred_labels, embeddings = cc.infer(TEXTS, top_k=3)
-
-def doc_save():
-    cc.save('temp/model_data')
-
-def doc_load():
-    cc.load('temp/model_data')
-
-def doc_show_non_interactive():
-    # Static plot (using Matplotlib)
-    cc.show(interactive=False)
-
-def doc_show_interactive():
-    # Interactive plot (using Plotly)
-    cc.show(interactive=True)
-
-def test_func(func):
-    global failures
-    try:
-        start = time.time()
-        func()
-        print(Fore.GREEN + f"{func} succeeded. Time taken: {time.time() - start:.2f}s")
-    except Exception as e:
-        print(Fore.RED + f"{func} failed with error: {e}")  # Print error to console
-        failures += 1
-
-def main():
-    global failures
-    start = time.time()
-
-    test_func(readme_basic_fit)
-    test_func(readme_basic_inference)
-    test_func(readme_advanced)
-
-    test_func(doc_class_example)
-    test_func(doc_optimize_fit)
-    test_func(doc_optimize)
-    test_func(optimize_with_sample)
-    test_func(doc_infer)
-    test_func(doc_save)
-    test_func(doc_load)
-    test_func(doc_show_non_interactive)
-    test_func(doc_show_interactive)
-
-    if failures == 0:
-        print(Fore.GREEN + f"All tests succeeded. Time taken: {time.time() - start:.2f}s")
-    else:
-        print(Fore.RED + f"{failures} tests failed.") 
-
-main()
+optimize_with_sample()
