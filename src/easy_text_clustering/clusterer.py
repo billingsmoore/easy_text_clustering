@@ -353,6 +353,7 @@ class ClusterClassifier:
             min_cluster_size = trial.suggest_int('hdbscan_min_cluster_size', 5, 100)  # Minimum cluster size
             min_samples = trial.suggest_int('hdbscan_min_samples', 1, 10)  # Minimum samples for a core point
             hdbscan_metric = trial.suggest_categorical('hdbscan_metric', ['euclidean', 'cosine'])  # Metric for HDBSCAN
+            cluster_selection_epsilon = trial.suggest_float('cluster_selection_epsilon', 0, 1.0)    #Cluster selection epsilon for hdbscan
 
             # Apply UMAP for dimensionality reduction
             umap_model = UMAP(n_neighbors=n_neighbors, min_dist=min_dist, metric=metric)
@@ -361,7 +362,8 @@ class ClusterClassifier:
             # Apply HDBSCAN for clustering
             hdbscan_model = HDBSCAN(min_cluster_size=min_cluster_size, 
                                     min_samples=min_samples, 
-                                    metric=hdbscan_metric)
+                                    metric=hdbscan_metric,
+                                    cluster_selection_epsilon=cluster_selection_epsilon)
             cluster_labels = hdbscan_model.fit_predict(umap_embedding)
 
             # Evaluate clustering performance using the silhouette score
@@ -397,7 +399,8 @@ class ClusterClassifier:
         self.clustering_algorithm = 'hdbscan'
         self.clustering_args = {'min_cluster_size': study.best_params['hdbscan_min_cluster_size'], 
                                 'min_samples': study.best_params['hdbscan_min_samples'], 
-                                'metric': study.best_params['hdbscan_metric']}
+                                'metric': study.best_params['hdbscan_metric'],
+                                'cluster_selection_epsilon': study.best_params['cluster_selection_epsilon']}
 
     def optimize_fit(self, texts=None, optimization_trials=None, sample_size=None):
         """
