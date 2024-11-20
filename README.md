@@ -333,8 +333,6 @@ my_clusterer.optimize_fit(texts=["Text 1", "Text 2", "Text 3"], optimization_tri
 
 #### optimize ( texts=None, optimization_trials=None )
 
-[source]
-
     Optimizes hyperparameters for dimensionality reduction (UMAP) and clustering (HDBSCAN) using Optuna. This method performs hyperparameter tuning by maximizing the silhouette score, a measure of clustering quality.
 
 ##### Parameters:
