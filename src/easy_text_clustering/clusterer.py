@@ -20,8 +20,7 @@ from sklearn.decomposition import TruncatedSVD, PCA
 
 from sklearn.cluster import DBSCAN, OPTICS, KMeans, HDBSCAN
 
-from sklearn.metrics import silhouette_score
-import optuna
+from optimizer import Optimizer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -337,70 +336,16 @@ class ClusterClassifier:
         if self.embeddings is None:
             self.embeddings = self.embed(self.texts)
 
+        # Confirm data sample size
         if len(self.embeddings) > self.sample_size:
-            data = random.sample(list(self.embeddings), self.sample_size)
+            self.data = random.sample(list(self.embeddings), self.sample_size)
         else:
-            data = self.embeddings
+            self.data = self.embeddings
 
-        # Define the objective function for Optuna optimization
-        def objective(trial):
-            # Suggest UMAP hyperparameters
-            n_neighbors = trial.suggest_int('umap_n_neighbors', 5, 50)  # Number of neighbors for UMAP
-            min_dist = trial.suggest_float('umap_min_dist', 0.0, 1.0)  # Minimum distance for UMAP
-            metric = trial.suggest_categorical('umap_metric', ['euclidean', 'cosine'])  # Metric for UMAP
-
-            # Suggest HDBSCAN hyperparameters
-            min_cluster_size = trial.suggest_int('hdbscan_min_cluster_size', 5, 100)  # Minimum cluster size
-            min_samples = trial.suggest_int('hdbscan_min_samples', 1, 10)  # Minimum samples for a core point
-            hdbscan_metric = trial.suggest_categorical('hdbscan_metric', ['euclidean', 'cosine'])  # Metric for HDBSCAN
-            cluster_selection_epsilon = trial.suggest_float('cluster_selection_epsilon', 0, 1.0)    #Cluster selection epsilon for hdbscan
-
-            # Apply UMAP for dimensionality reduction
-            umap_model = UMAP(n_neighbors=n_neighbors, min_dist=min_dist, metric=metric)
-            umap_embedding = umap_model.fit_transform(data)
-
-            # Apply HDBSCAN for clustering
-            hdbscan_model = HDBSCAN(min_cluster_size=min_cluster_size, 
-                                    min_samples=min_samples, 
-                                    metric=hdbscan_metric,
-                                    cluster_selection_epsilon=cluster_selection_epsilon)
-            cluster_labels = hdbscan_model.fit_predict(umap_embedding)
-
-            # Evaluate clustering performance using the silhouette score
-            # Silhouette score requires at least 2 clusters; handle single-cluster cases
-            if len(np.unique(cluster_labels)) > 1:
-                score = silhouette_score(umap_embedding, cluster_labels)
-            else:
-                score = -1  # Assign a low score for poor clustering results (e.g., single cluster)
-
-            return score
-
-        # Create and optimize an Optuna study
-        while True:
-            try:
-                study = optuna.create_study(direction='maximize')  # Maximize the silhouette score
-                study.optimize(objective, n_trials=self.optimization_trials)
-                break
-            except:
-                # if study fails, retry with 80% of sample size
-                print(f'Study failed with sample size: {self.sample_size}')
-                self.sample_size = self.sample_size // (self.sample_size * 1.25)
-                print(f'Re-trying with sample size: {self.sample_size}')
-
-        # Print the best parameters and corresponding score
-        print("Best Parameters:", study.best_params)
-        print("Best Score:", study.best_value)
-
-        # Update projection and clustering algorithms with the optimized parameters
-        self.projection_algorithm = 'umap'
-        self.projection_args = {'n_neighbors': study.best_params['umap_n_neighbors'], 
-                                'min_dist': study.best_params['umap_min_dist'], 
-                                'metric': study.best_params['umap_metric']}
-        self.clustering_algorithm = 'hdbscan'
-        self.clustering_args = {'min_cluster_size': study.best_params['hdbscan_min_cluster_size'], 
-                                'min_samples': study.best_params['hdbscan_min_samples'], 
-                                'metric': study.best_params['hdbscan_metric'],
-                                'cluster_selection_epsilon': study.best_params['cluster_selection_epsilon']}
+        opt = Optimizer()
+        projection_args, clustering_args = opt.fit(self.data, self.optimization_trials)
+        
+        return projection_args, clustering_args
 
     def optimize_fit(self, texts=None, optimization_trials=None, sample_size=None):
         """
@@ -418,7 +363,7 @@ class ClusterClassifier:
             None
         """
         # Step 1: Perform optimization to find the best hyperparameters
-        self.optimize(texts, optimization_trials, sample_size)
+        self.projections_args, self. clustering_args = self.optimize(texts, optimization_trials, sample_size)
 
         # Step 2: Fit the model using the optimized parameters
         self.fit(texts)

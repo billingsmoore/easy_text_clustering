@@ -3,6 +3,7 @@ import os
 import time
 from colorama import init, Fore
 init(autoreset=True)
+from datasets import load_dataset
 
 # Add the src directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/easy_text_clustering')))
@@ -197,11 +198,12 @@ def doc_class_example():
     my_clusterer.save("temp/cluster_classifier_5_clusters")
 
 def doc_optimize():
+    texts = load_dataset('billingsmoore/text-clustering-example-data', split="train")['text']
     cluster_classifier = ClusterClassifier(summary_create=False)
     cluster_classifier.optimize(
-    texts=TEXTS,
+    texts=texts,
     optimization_trials=2
-)
+    )
     
 def doc_optimize_fit():
     # Initialize the clustering object
@@ -211,8 +213,9 @@ def doc_optimize_fit():
     my_clusterer.optimize_fit(texts=TEXTS, optimization_trials=2)
 
 def optimize_with_sample():
+    texts = load_dataset('billingsmoore/text-clustering-example-data', split="train")['text']
     cc = ClusterClassifier(summary_create=False)
-    cc.optimize_fit(TEXTS, 2, sample_size=25)
+    cc.optimize_fit(texts, 2, sample_size=10) # This should fail repeatedly but gracefully
 
 def doc_infer():
     inferred_labels, embeddings = cc.infer(TEXTS, top_k=3)
