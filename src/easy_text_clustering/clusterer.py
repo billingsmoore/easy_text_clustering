@@ -20,7 +20,7 @@ from sklearn.decomposition import TruncatedSVD, PCA
 
 from sklearn.cluster import DBSCAN, OPTICS, KMeans, HDBSCAN
 
-from optimizer import Optimizer
+from easy_text_clustering.optimizer import Optimizer
 
 logging.basicConfig(level=logging.INFO)
 

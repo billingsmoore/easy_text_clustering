@@ -27,7 +27,7 @@ def test_optimize_embeddings():
     opt=Optimizer()
     cc = ClusterClassifier()
     embeddings = cc.embed(texts)
-    a, b = opt.fit(embeddings)
+    a, b = opt.fit(embeddings, 2)
     print(a)
     print(b)
 
@@ -48,6 +48,7 @@ def main():
     start = time.time()
 
     test_func(test_optimize_texts)
+    test_func(test_optimize_embeddings)
 
     if failures == 0:
         print(Fore.GREEN + f"All tests succeeded. Time taken: {time.time() - start:.2f}s")
