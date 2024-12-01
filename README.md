@@ -54,6 +54,15 @@ opt = Optimizer()
 
 best_umap_args, best_hdbscan_args = opt.fit(texts)
 ```
+If you have a preferred number of clusters, you can set a minimum and maximum number of clusters like so:
+
+```python
+from easy_text_clustering.optimizer import Optimizer
+
+opt = Optimizer(min_clusters=15, max_clusters=35)
+
+best_umap_args, best_hdbscan_args = opt.fit(texts)
+```
 
 ## Basic ClusterClassifier Usage
 

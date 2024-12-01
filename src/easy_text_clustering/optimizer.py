@@ -22,6 +22,9 @@ class Optimizer():
         embed_device='cpu',
         embed_model_name='all-MiniLM-L6-v2',
         embed_max_seq_length=512,
+        score_weights=(1,1,1,1),
+        min_clusters=2,
+        max_clusters=100
     ):
         """
         Initializes the Optimizer class with embedding configuration.
@@ -36,6 +39,9 @@ class Optimizer():
         self.embed_device = embed_device
         self.embed_model_name = embed_model_name
         self.embed_max_seq_length = embed_max_seq_length
+        self.score_weights = score_weights
+        self.min_clusters = min_clusters
+        self.max_clusters = max_clusters
 
         # Store hyperparameters for dimensionality reduction and clustering
         self.umap_args = None
@@ -95,11 +101,8 @@ class Optimizer():
                 )
                 cluster_labels = hdbscan_model.fit_predict(umap_embedding)
 
-                # Evaluate clustering performance using silhouette score
-                if len(np.unique(cluster_labels)) > 1:
-                    score = self.compute_score(umap_embedding, cluster_labels)
-                else:
-                    score = -1  # Assign a low score for single-cluster results
+                score = self.compute_score(umap_embedding, cluster_labels, self.score_weights, self.min_clusters, self.max_clusters)
+
             except Exception as e:
                 print(e)
                 score = -1  # Assign a low score to failed trials
@@ -144,11 +147,11 @@ class Optimizer():
         """
         return (value - min_val) / (max_val - min_val)
 
-    def compute_score(self, data, cluster_labels, weights=(1, 1, 1)):
+    def compute_score(self, data, cluster_labels, weights, min_clusters, max_clusters):
         """
         Compute a composite clustering score using silhouette, CH index, and DB index.
         """
-        silhouette_weight, ch_weight, db_weight = weights
+        silhouette_weight, ch_weight, db_weight, cluster_count_weight = weights
 
         # Silhouette Score
         silhouette = silhouette_score(data, cluster_labels)
@@ -162,11 +165,26 @@ class Optimizer():
         db_index = davies_bouldin_score(data, cluster_labels)
         db_normalized = 1 - self.normalize(db_index, 0, 10)
 
-        return (
+        # Number of clusters
+        n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)  # Exclude noise points
+        
+        # Penalize if cluster count is outside desired range
+        if n_clusters < min_clusters:
+            cluster_penalty = -abs(n_clusters - min_clusters)
+        elif n_clusters > max_clusters:
+            cluster_penalty = -abs(n_clusters - max_clusters)
+        else:
+            cluster_penalty = 1  # Reward acceptable cluster counts
+
+        # Composite score
+        composite_score = (
             silhouette_weight * silhouette +
             ch_weight * ch_normalized +
-            db_weight * db_normalized
+            db_weight * db_normalized +
+            cluster_count_weight * cluster_penalty
         )
+        
+        return composite_score
 
     def embed(self, texts):
         """

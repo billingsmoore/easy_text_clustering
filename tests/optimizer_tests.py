@@ -31,6 +31,13 @@ def test_optimize_embeddings():
     print(a)
     print(b)
 
+def test_optimize_texts_with_cluster_sizes():
+    global texts
+    opt = Optimizer(min_clusters=5, max_clusters=10)
+    umap_args, hdbscan_args = opt.fit(texts, 20, sample_size=1000)
+    print(umap_args)
+    print(hdbscan_args)
+
 def test_func(func):
     global failures
     try:
@@ -49,6 +56,7 @@ def main():
 
     test_func(test_optimize_texts)
     test_func(test_optimize_embeddings)
+    test_func(test_optimize_texts_with_cluster_sizes)
 
     if failures == 0:
         print(Fore.GREEN + f"All tests succeeded. Time taken: {time.time() - start:.2f}s")
