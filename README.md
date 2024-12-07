@@ -8,7 +8,7 @@ This repository contains tools to easily embed and cluster texts as well as labe
 ## How it works
 The pipeline consists of several distinct blocks that can be customized. Each block uses existing standard methods and works quite robustly. The default pipeline is shown in the graphic below.
 
-<center><img src="docs/readme-assets/pipeline-diagram.png" width=600></center>
+<center><img src="https://github.com/billingsmoore/easy_text_clustering/blob/main/docs/readme-assets/pipeline-diagram.png?raw=true" width=600></center>
 <center>Text clustering pipeline.</center>
 
 Users can choose their models for embeddings and labeling as well as alternative algorithms for projection and clustering, and customize all hyperparameters for those algorithms. However, the default values for these things are optimal for most use cases.
