@@ -81,22 +81,23 @@ class Optimizer():
             # Suggest UMAP hyperparameters
             n_neighbors = trial.suggest_int('umap_n_neighbors', 5, 50)
             min_dist = trial.suggest_float('umap_min_dist', 0.0, 1.0)
-            metric = trial.suggest_categorical('umap_metric', ['euclidean', 'cosine'])
 
             # Suggest HDBSCAN hyperparameters
             min_cluster_size = trial.suggest_int('hdbscan_min_cluster_size', 5, 100)
-            hdbscan_metric = trial.suggest_categorical('hdbscan_metric', ['euclidean', 'cosine'])
             cluster_selection_epsilon = trial.suggest_float('cluster_selection_epsilon', 0, 1.0)
 
             try:
                 # Dimensionality reduction using UMAP
-                umap_model = UMAP(n_neighbors=n_neighbors, min_dist=min_dist, metric=metric)
+                umap_model = UMAP(n_neighbors=n_neighbors, 
+                                  min_dist=min_dist, 
+                                  metric='cosine')
                 umap_embedding = umap_model.fit_transform(data)
 
                 # Clustering using HDBSCAN
                 hdbscan_model = HDBSCAN(
+                    cluster_selection_method='leaf',
                     min_cluster_size=min_cluster_size,
-                    metric=hdbscan_metric,
+                    metric='euclidean',
                     cluster_selection_epsilon=cluster_selection_epsilon
                 )
                 cluster_labels = hdbscan_model.fit_predict(umap_embedding)
@@ -129,11 +130,12 @@ class Optimizer():
         projection_args = {
             'n_neighbors': study.best_params['umap_n_neighbors'],
             'min_dist': study.best_params['umap_min_dist'],
-            'metric': study.best_params['umap_metric']
+            'metric': 'cosine'
         }
         clustering_args = {
+            'cluster_selection_method': 'leaf',
             'min_cluster_size': study.best_params['hdbscan_min_cluster_size'],
-            'metric': study.best_params['hdbscan_metric'],
+            'metric': 'euclidean',
             'cluster_selection_epsilon': study.best_params['cluster_selection_epsilon']
         }
 
