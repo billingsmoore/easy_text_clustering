@@ -8,10 +8,10 @@ This repository contains tools to easily embed and cluster texts as well as labe
 ## How it works
 The pipeline consists of several distinct blocks that can be customized. Each block uses existing standard methods and works quite robustly. The default pipeline is shown in the graphic below.
 
-<center><img src="https://huggingface.co/datasets/lvwerra/admin/resolve/main/text-clustering.png"></center>
+<center><img src="docs/readme-assets/pipeline-diagram.png" width=600></center>
 <center>Text clustering pipeline.</center>
 
-As was true in the original repo, users can choose alternative models for Embeddings and labeling. Additionally, in this version, users can choose alternative algorithms for projection and clustering, and customize all hyperparameters for those algorithms.
+Users can choose their models for embeddings and labeling as well as alternative algorithms for projection and clustering, and customize all hyperparameters for those algorithms. However, the default values for these things are optimal for most use cases.
 
 ## Install 
 
