@@ -101,8 +101,32 @@ cc.load("./clustering-results")
 cc.show()
 
 # classify new texts with k-nearest neighbour search
-cluster_labels, embeddings = cc.infer(some_texts, top_k=1)
+cluster_labels, embeddings = cc.infer(new__texts, top_k=1)
 ```
+
+Or if you'd like to create a new ClusterClassifier object by running inference on texts, you can do so like this:
+
+```python
+from easy_text_clustering.clusterer import ClusterClassifier
+from datasets import load_dataset
+
+new_texts = load_dataset("billingsmoore/text-clustering-example-data", split="train")["text"]
+
+cc = ClusterClassifier()
+
+# load state
+cc.load("./clustering-results")
+
+# classify new texts with k-nearest neighbour search
+new_cc = cc.infer_classifier(new_texts)
+
+# visualize new classifier
+new_cc.show()
+
+# save results
+new_cc.save()
+```
+
 
 If you want to customize the color scheme in the plot you can add (some version of) the following code before you run `cc.show()`:
 ```python
@@ -174,7 +198,7 @@ cc.save("./clustering-results")
 
 This is project was created, and is maintained, by [@billingsmoore](https://github.com/billingsmoore).
 
-This project is a fork of ['huggingface/text-clustering'](https://github.com/huggingface/text-clustering). All images in this README come from their repo. The following changes have been made to the codebase:
+The ClusterClassifier portion of this project is a fork of ['huggingface/text-clustering'](https://github.com/huggingface/text-clustering).. The following changes have been made to the codebase:
 
 1. Projection and clustering algorithms can now be selected by the user as appropriate for their use-case.
 2. Each algorithm's relevant hyperparamaters can be provided by the user as a dictionary, without having to store all possible hyperparameters.
@@ -184,6 +208,8 @@ This project is a fork of ['huggingface/text-clustering'](https://github.com/hug
 6. A simple automated test suite has been added to the repo.
 7. An optimization method has been added to allow for easy optimization of hyperparameters
 8. A stand-alone Optimizer class been added
+9. You can now infer a ClusterClassifier object using a previously trained ClusterClassifier
+10. Saving and loading now works even if certain properties are not yet defined for the ClusterClassifier
 
 Additionally, a substantial amount of documentation has been added to this repository for both the new functionality and the original functionality, improving readability and usability. This documentation is available as comments in the code and below in this README.
 

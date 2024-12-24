@@ -268,6 +268,28 @@ class ClusterClassifier:
             inferred_labels.append(Counter(labels).most_common(1)[0][0])
 
         return inferred_labels, embeddings
+    
+
+    def infer_classifier(self, texts, top_k=1):
+
+        new_cc = ClusterClassifier()
+
+        labels, embeddings = self.infer(texts, top_k=top_k)
+
+        new_cc.texts = texts
+        new_cc.embeddings = embeddings # from inference above
+        new_cc.projections, new_cc.mapper = new_cc.project(embeddings, 'umap', {})
+        new_cc.cluster_labels = labels # from inference above
+        new_cc.store_cluster_info(new_cc.cluster_labels)
+
+        try:
+            new_cc.cluster_summaries = new_cc.summarize(new_cc.texts, new_cc.cluster_labels)
+        except:
+            print('Failed to summarize clusters. Using blank dictionary.')
+            new_cc.cluster_summaries = {}
+
+        return new_cc
+
 
     def batch_and_join(self, texts, n):
 
@@ -690,23 +712,28 @@ class ClusterClassifier:
             os.makedirs(folder)
 
         # Save embeddings as a binary NumPy file
-        with open(f"{folder}/embeddings.npy", "wb") as f:
-            np.save(f, self.embeddings)
+        if self.embeddings:
+            with open(f"{folder}/embeddings.npy", "wb") as f:
+                np.save(f, self.embeddings)
 
         # Save FAISS index to disk
-        faiss.write_index(self.faiss_index, f"{folder}/faiss.index")
+        if self.faiss_index:
+            faiss.write_index(self.faiss_index, f"{folder}/faiss.index")
 
         # Save projections as a binary NumPy file
-        with open(f"{folder}/projections.npy", "wb") as f:
-            np.save(f, self.projections)
+        if self.projections:
+            with open(f"{folder}/projections.npy", "wb") as f:
+                np.save(f, self.projections)
 
         # Save cluster labels as a binary NumPy file
-        with open(f"{folder}/cluster_labels.npy", "wb") as f:
-            np.save(f, self.cluster_labels)
+        if self.cluster_labels:
+            with open(f"{folder}/cluster_labels.npy", "wb") as f:
+                np.save(f, self.cluster_labels)
 
         # Save the raw texts as a JSON file
-        with open(f"{folder}/texts.json", "w") as f:
-            json.dump(self.texts, f)
+        if self.texts:
+            with open(f"{folder}/texts.json", "w") as f:
+                json.dump(self.texts, f)
 
         # Save the default instruction prompt in a text file
         with open(f"{folder}/mistral_prompt.txt", "w") as f:
@@ -751,23 +778,28 @@ class ClusterClassifier:
             raise ValueError(f"The folder '{folder}' does not exist.")
 
         # Load embeddings from file
-        with open(f"{folder}/embeddings.npy", "rb") as f:
-            self.embeddings = np.load(f)
+        if os.path.exists(f"{folder}/embeddings.npy"):
+            with open(f"{folder}/embeddings.npy", "rb") as f:
+                self.embeddings = np.load(f)
 
         # Load FAISS index
-        self.faiss_index = faiss.read_index(f"{folder}/faiss.index")
+        if os.path.exists(f"{folder}/faiss.index"):
+            self.faiss_index = faiss.read_index(f"{folder}/faiss.index")
 
         # Load projections from file
-        with open(f"{folder}/projections.npy", "rb") as f:
-            self.projections = np.load(f)
+        if os.path.exists(f"{folder}/projections.npy"):
+            with open(f"{folder}/projections.npy", "rb") as f:
+                self.projections = np.load(f)
 
         # Load cluster labels from file
-        with open(f"{folder}/cluster_labels.npy", "rb") as f:
-            self.cluster_labels = np.load(f)
+        if os.path.exists(f"{folder}/cluster_labels.npy"):
+            with open(f"{folder}/cluster_labels.npy", "rb") as f:
+                self.cluster_labels = np.load(f)
 
         # Load raw texts from file
-        with open(f"{folder}/texts.json", "r") as f:
-            self.texts = json.load(f)
+        if os.path.exists(f"{folder}/texts.json"):
+            with open(f"{folder}/texts.json", "r") as f:
+                self.texts = json.load(f)
 
         # Optionally load cluster summaries if available
         if os.path.exists(f"{folder}/cluster_summaries.json"):
@@ -914,21 +946,22 @@ class ClusterClassifier:
             )
 
         # Annotate each cluster with its summary text at the cluster center
-        for label in self.cluster_summaries.keys():
-            if label == -1:
-                continue  # Skip the outlier cluster
-            summary = self.cluster_summaries[label]
-            position = self.cluster_centers[label]
-            t = ax.text(
-                position[0],
-                position[1],
-                summary,
-                horizontalalignment='center',
-                verticalalignment='center',
-                fontsize=4,
-            )
-            # Set the background for the text annotation for better readability
-            t.set_bbox(dict(facecolor='white', alpha=0.9, linewidth=0, boxstyle='square,pad=0.1'))
+        if self.cluster_summaries:
+            for label in self.cluster_summaries.keys():
+                if label == -1:
+                    continue  # Skip the outlier cluster
+                summary = self.cluster_summaries[label]
+                position = self.cluster_centers[label]
+                t = ax.text(
+                    position[0],
+                    position[1],
+                    summary,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    fontsize=4,
+                )
+                # Set the background for the text annotation for better readability
+                t.set_bbox(dict(facecolor='white', alpha=0.9, linewidth=0, boxstyle='square,pad=0.1'))
 
         # Turn off the axis for a cleaner plot
         ax.set_axis_off()
@@ -1009,29 +1042,30 @@ class ClusterClassifier:
         )
 
         # Add cluster summaries as annotations at the cluster centers
-        for label in self.cluster_summaries.keys():
-            if label == -1:
-                continue  # Skip outlier clusters
-            summary = self.cluster_summaries[label]
-            position = self.cluster_centers[label]
+        if self.cluster_summaries:
+            for label in self.cluster_summaries.keys():
+                if label == -1:
+                    continue  # Skip outlier clusters
+                summary = self.cluster_summaries[label]
+                position = self.cluster_centers[label]
 
-            if len(self.projections[0]) == 2:
-                fig.add_annotation(
-                    x=position[0],
-                    y=position[1],
-                    text=summary,
-                    showarrow=False,
-                    yshift=0,
-                )
-            else:
-                fig.add_annotation(
-                    x=position[0],
-                    y=position[1],
-                    z=position[2],
-                    text=summary,
-                    showarrow=False,
-                    yshift=0,
-                )
+                if len(self.projections[0]) == 2:
+                    fig.add_annotation(
+                        x=position[0],
+                        y=position[1],
+                        text=summary,
+                        showarrow=False,
+                        yshift=0,
+                    )
+                else:
+                    fig.add_annotation(
+                        x=position[0],
+                        y=position[1],
+                        z=position[2],
+                        text=summary,
+                        showarrow=False,
+                        yshift=0,
+                    )
 
         # Show the plot
         fig.show()
