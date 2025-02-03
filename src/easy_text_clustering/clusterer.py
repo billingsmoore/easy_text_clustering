@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import math
 
 import plotly.express as px
 
@@ -500,6 +501,47 @@ class ClusterClassifier:
 
         # Store the resulting cluster labels
         self.store_cluster_info(clustering.labels_)
+
+    def classify_outliers(self):
+        """
+        Classifies outlier data points by assigning them to the closest cluster based on their projection coordinates.
+        Outliers are identified as data points with the label `-1` in `self.label2docs`. This function updates the cluster
+        labels and other related features of the classifier to reflect the new assignments.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Notes:
+            - Outliers are identified as data points with the label `-1` in `self.label2docs`.
+            - The function calculates the Euclidean distance between each outlier's projection coordinates and the cluster
+            centers to determine the closest cluster.
+            - The cluster labels (`self.cluster_labels`) are updated to reflect the new assignments.
+            - The function calls `self.store_cluster_info` to update other features of the classifier based on the new
+            cluster labels.
+        """
+
+        # Keep [original key, projection coords] for outlier data points
+        outlier_projs = [[elt, self.projections[elt]] for elt in self.label2docs[-1]]
+
+        # Precompute cluster centers (excluding the -1 key, which represents outliers)
+        cluster_centers = [[key, val] for key, val in self.cluster_centers.items() if key != -1]
+
+        # Find the best label for each outlier by finding the closest cluster center
+        best_labels = []
+        for proj in outlier_projs:
+            # Calculate distances to all cluster centers and find the closest one
+            closest_label = min(cluster_centers, key=lambda center: math.dist(proj[1], center[1]))[0]
+            best_labels.append([proj[0], closest_label])
+
+        # Update cluster labels to reflect the new assignments
+        for new in best_labels:
+            self.cluster_labels[new[0]] = new[1]
+
+        # Update other features of the classifier based on the new cluster labels
+        self.store_cluster_info(self.cluster_labels)
 
     def store_cluster_info(self, cluster_labels):
         """

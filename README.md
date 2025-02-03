@@ -198,7 +198,7 @@ cc.save("./clustering-results")
 
 This is project was created, and is maintained, by [@billingsmoore](https://github.com/billingsmoore).
 
-The ClusterClassifier portion of this project is a fork of ['huggingface/text-clustering'](https://github.com/huggingface/text-clustering).. The following changes have been made to the codebase:
+The ClusterClassifier portion of this project is a fork of ['huggingface/text-clustering'](https://github.com/huggingface/text-clustering). The following changes have been made to the codebase:
 
 1. Projection and clustering algorithms can now be selected by the user as appropriate for their use-case.
 2. Each algorithm's relevant hyperparamaters can be provided by the user as a dictionary, without having to store all possible hyperparameters.
@@ -210,6 +210,7 @@ The ClusterClassifier portion of this project is a fork of ['huggingface/text-cl
 8. A stand-alone Optimizer class been added
 9. You can now infer a ClusterClassifier object using a previously trained ClusterClassifier
 10. Saving and loading now works even if certain properties are not yet defined for the ClusterClassifier
+11. ClusterClassifier can now classify outliers so that every element is labeled.
 
 Additionally, a substantial amount of documentation has been added to this repository for both the new functionality and the original functionality, improving readability and usability. This documentation is available as comments in the code and below in this README.
 
