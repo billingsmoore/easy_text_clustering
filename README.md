@@ -202,15 +202,16 @@ The ClusterClassifier portion of this project is a fork of ['huggingface/text-cl
 
 1. Projection and clustering algorithms can now be selected by the user as appropriate for their use-case.
 2. Each algorithm's relevant hyperparamaters can be provided by the user as a dictionary, without having to store all possible hyperparameters.
-3. Visualizations can now be done interactively in 3 dimensions.
-4. The pipeline can be run and re-run with new hyperparameters, or even new algorithm selections for projections and/or clustering without having to re-perform computationally expensive embedding or projections unnecessarily. 
-5. Texts can be batched into groups prior to clustering.
-6. A simple automated test suite has been added to the repo.
-7. An optimization method has been added to allow for easy optimization of hyperparameters
-8. A stand-alone Optimizer class been added
-9. You can now infer a ClusterClassifier object using a previously trained ClusterClassifier
-10. Saving and loading now works even if certain properties are not yet defined for the ClusterClassifier
-11. ClusterClassifier can now classify outliers so that every element is labeled.
+3. By default, clustering now uses HDBSCAN rather than DBSCAN.
+4. Visualizations can now be done interactively in 3 dimensions.
+5. The pipeline can be run and re-run with new hyperparameters, or even new algorithm selections for projections and/or clustering without having to re-perform computationally expensive embedding or projections unnecessarily. 
+6. Texts can be batched into groups prior to clustering.
+7. A simple automated test suite has been added to the repo.
+8. An optimization method has been added to allow for easy optimization of hyperparameters
+9. A stand-alone Optimizer class been added
+10. You can now infer a ClusterClassifier object using a previously trained ClusterClassifier
+11. Saving and loading now works even if certain properties are not yet defined for the ClusterClassifier
+12. ClusterClassifier can now classify outliers so that every element is labeled.
 
 Additionally, a substantial amount of documentation has been added to this repository for both the new functionality and the original functionality, improving readability and usability. This documentation is available as comments in the code and below in this README.
 
