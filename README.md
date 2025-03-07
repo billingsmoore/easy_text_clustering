@@ -1,9 +1,9 @@
 # Text Clustering
 
-This repository contains tools to easily embed and cluster texts as well as label clusters semantically and produce visualizations of those labeled clusters. 
+This repository contains tools to easily embed and cluster texts as well as label clusters semantically and produce visualizations of those labeled clusters. This project began as a fork of [huggingface/text-clustering](https://github.com/huggingface/text-clustering) but has been substantially altered, see [Credits](#Credits) below.
 
 <center><img src="https://cdn-uploads.huggingface.co/production/uploads/61c141342aac764ce1654e43/jMKGaE_UnEfH3j8iZYXVN.png"></center>
-<center>Clustering of texts in the <a href="https://huggingface.co/datasets/HuggingFaceTB/cosmopedia">Cosmopedia dataset</a>.</center>
+<center>Clustering of texts in the <a href="https://huggingface.co/datasets/HuggingFaceTB/cosmopedia">Cosmopedia dataset (Visualization created by huggingface/text-clustering)</a>.</center>
 
 ## How it works
 The pipeline consists of several distinct blocks that can be customized. Each block uses existing standard methods and works quite robustly. The default pipeline is shown in the graphic below.
